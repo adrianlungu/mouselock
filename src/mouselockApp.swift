@@ -16,7 +16,7 @@ class AppState: ObservableObject {
     static let shared = AppState();
     
     @Published var games: Dictionary<String, String> = [
-        "com.riotgames.LeagueofLegends.GameClient": "1/League of Legends"
+        "tv.parsec.www": "1/Parsec",
     ];
     
     @Published var width: String = UserDefaults.standard.string(forKey: "width") ?? "1920" {
@@ -61,30 +61,34 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 return;
             }
             
-            // mouse lock
+            let options = CGWindowListOption(arrayLiteral: CGWindowListOption.excludeDesktopElements, CGWindowListOption.optionOnScreenOnly)
+            let windowListInfo = CGWindowListCopyWindowInfo(options, CGWindowID(0))
+            let windowInfoList = windowListInfo as NSArray? as? [[String: AnyObject]]
+            let currentPID = NSWorkspace().frontmostApplication?.processIdentifier
+//            let info = windowInfoList?[0]
+            let info = windowInfoList?.first { info in
+              return (info["kCGWindowOwnerPID"] as! UInt32) == currentPID!
+            }
+            let pos = NSEvent.mouseLocation
             let deltaX = event.deltaX - self.lastDeltaX;
             let deltaY = event.deltaY - self.lastDeltaY;
-            let x = event.locationInWindow.flipped.x;
-            let y = event.locationInWindow.flipped.y;
-
-            let window = (NSScreen.main?.frame.size)!
+            let mouseY = pos.flipped.y + deltaY
+            let mouseX = pos.x + deltaX
             
-            let width = CGFloat(Int(AppState.shared.width) ?? Int(window.width));
-            let height = CGFloat(Int(AppState.shared.height) ?? Int(window.height));
+            let windowHeight = CGFloat((info?["kCGWindowBounds"] as? [String: NSNumber])?["Height"]?.doubleValue ?? 0)
+            let windowWidth = CGFloat((info?["kCGWindowBounds"] as? [String: NSNumber])?["Width"]?.doubleValue ?? 0)
+            let windowX = CGFloat((info?["kCGWindowBounds"] as? [String: NSNumber])?["X"]?.doubleValue ?? 0)
+            let windowY = CGFloat((info?["kCGWindowBounds"] as? [String: NSNumber])?["Y"]?.doubleValue ?? 0)
+          
+            let pointX = clamp(mouseX, minValue: windowX, maxValue: windowX + windowWidth);
+            let pointY = clamp(mouseY, minValue: windowY, maxValue: windowY + windowHeight);
+            self.lastDeltaX = deltaX
+            self.lastDeltaY = deltaY
+          
+            print("windowX: ", windowX, ", windowY: ", windowY, ", windowHeight: ", windowHeight, ", windowWidth: ", windowWidth, ", pointX: ", pointX, ", pointY: ", pointY)
             
-            // add 1 to be sure we're completely inside window
-            let widthCut = ((window.width - width) / 2) + 1;
-            let heightCut = ((window.height - height) / 2) + 1;
-            
-            // confine points to width and height
-            let xPoint = clamp(x + deltaX, minValue: widthCut, maxValue: window.width - widthCut);
-            let yPoint = clamp(y + deltaY, minValue: heightCut, maxValue: window.height - heightCut);
-            
-            // save old deltas
-            self.lastDeltaX = xPoint - x;
-            self.lastDeltaY = yPoint - y;
-            
-            CGWarpMouseCursorPosition(CGPoint(x: xPoint, y: yPoint));
+            print(pointX, pointY)
+            CGWarpMouseCursorPosition(CGPoint(x: pointX, y: pointY));
             self.lastTime = ProcessInfo.processInfo.systemUptime;
         });
     }
